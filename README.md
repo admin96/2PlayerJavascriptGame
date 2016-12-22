@@ -1,4 +1,7 @@
 # 2PlayerJavascriptGame
+
+Image assets grabbed from [Rocket5](http://www.rocket5studios.com/tutorials/make-a-2d-2-player-platformer-game-with-unity-4-3/)
+
 The ES6 classes feature is available in the following browsers and is required to run this game
 
 ![alt tag](https://raw.githubusercontent.com/admin96/2PlayerJavascriptGame/gh-pages/desktopbrowsercompatibility.PNG)
