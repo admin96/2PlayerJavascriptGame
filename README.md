@@ -1,7 +1,9 @@
 # 2PlayerJavascriptGame
 
 **Controls**
+
 *Player1*: a/d - Left/Right | w for jumping | f to shoot fireball
+
 *Player2*: left button/right button - Left/Right | up button for jumping | k to shoot fireball
 
 Image assets grabbed from [Rocket5](http://www.rocket5studios.com/tutorials/make-a-2d-2-player-platformer-game-with-unity-4-3/)
