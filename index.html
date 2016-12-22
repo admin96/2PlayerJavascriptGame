@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
+		<style>
+			body {
+				padding: 0; 
+				margin: 0;
+				font-family: 'Roboto', sans-serif;
+			}
+			#canvasContainer{
+				margin: auto;
+			}
+			img{
+				display: none;
+			}
+			#score{
+				border-width:3px;
+				background-color:#cae8ca;
+				border-style:solid;
+				position:fixed;
+				padding:5px;
+				bottom:0;
+				right:0;
+				max-width:300px;
+				z-index:999;
+			}
+		</style>
+		<script>
+			function setPadding()
+			{
+				var w = window.innerWidth;
+				var h = window.innerHeight;
+				if (h - 600 > 0)
+				{
+					h = h - 600;
+					document.getElementById("canvasContainer").style.paddingTop = h/2 + "px";
+				}
+				//console.log("Set Padding");
+			}
+			
+			// Assign function to onresize event
+			window.onresize = setPadding;
+		</script>
+	</head>
+	<body onload="setPadding()">
+		<script>
+			// Canvas initialization code ------------------------------------------//
+			
+			// Store size of the browser window into width and height variables
+			var CANVAS_WIDTH = 800;
+			var CANVAS_HEIGHT = 600;
+			
+			// Create canvas element. This is where we draw our graphics
+			var canvasElement = document.createElement("canvas");
+			
+			canvasElement.width = CANVAS_WIDTH;
+			canvasElement.height = CANVAS_HEIGHT;
+			
+			// We need the "canvas context" to draw graphics
+			// We'll just grab it here and store it in a variable
+			var canvas = canvasElement.getContext("2d");
+			
+			// Append canvas to div
+			var div = document.createElement("div");
+			div.setAttribute("id", "canvasContainer");
+			div.setAttribute("align", "center");
+			div.appendChild(canvasElement);
+			
+			// Add the div with the canvas to the body 
+			document.body.appendChild(div);
+			
+			canvas.textAlign = "center";
+			canvas.font = "30px Roboto";
+			
+			var FPS = 30;
+			setInterval(
+				function() {
+				  //update();
+				  draw();
+				}, 
+				1000/FPS
+			);
+			
+			var frame = 0;
+			
+			//----------------------------------------------------------------------//
+			
+			var p1Score = 0;
+			var p2Score = 0;
+			
+			class Vector 
+			{
+			  constructor(x, y) 
+			  {
+				this.x = x;
+				this.y = y;
+			  }
+			  get X()
+			  {
+				return this.x;
+			  }
+			  get Y()
+			  {
+				return this.y;
+			  }
+			  add(vector)
+			  {
+				  this.x += vector.x;
+				  this.y += vector.y;
+			  }
+			  sub(vector)
+			  {
+				  this.x -= vector.x;
+				  this.y -= vector.y;
+			  }
+			}
+			
+			var PLAYER_SIZE = new Vector(50, 50);
+			var FIREBALL_SIZE = new Vector(70, 70);
+			var fireballs = [];
+			
+			var fireballAnimation = createFireballAnimation();
+			
+			function createFireballAnimation()
+			{
+				var fireballSpriteNames = 
+				[
+					"ball_f0.png",
+					"ball_f1.png",
+					"ball_f2.png",
+					"ball_f3.png",
+					"ball_f4.png",
+					"ball_f5.png"
+				];
+				var sprites = [];
+				for (var i = 0; i < fireballSpriteNames.length; i++)
+				{
+					sprites.push(new Image());
+					sprites[i].src = "Sprites/Ball/" + fireballSpriteNames[i];
+				}
+				return sprites;
+			}
+			
+			class Fireball
+			{
+				constructor(x, y, dir)
+				{
+					this.loc = new Vector(x, y);
+					this.size = FIREBALL_SIZE;
+					this.frame = 0;
+					this.active = true;
+					if (dir == "left")
+					{
+						this.dir = new Vector(-15, 0);
+					}
+					else if (dir == "right")
+					{
+						this.dir = new Vector(15, 0);
+					}
+				}
+				
+				draw()
+				{
+					canvas.drawImage(
+						fireballAnimation[this.frame % 5],
+						this.loc.x, 
+						this.loc.y
+					);
+					if (frame % 3 == 0)
+					{
+						this.frame++;
+					}
+					this.loc.add(this.dir);
+					if (this.loc.x < -FIREBALL_SIZE.x || this.loc.x > CANVAS_WIDTH)
+					{
+						this.active = false;
+					}
+				}
+			}
+			
+			var gravity = new Vector(0, 5);
+			
+			function collides(a, b)
+			{
+				return a.loc.x < b.loc.x + b.size.x &&
+				 a.loc.x + a.size.x > b.loc.x &&
+				 a.loc.y + a.size.y < b.loc.y + b.size.y &&
+				 a.loc.y + a.size.y > b.loc.y;
+			}
+			
+			function collidesUp(a, b)
+			{
+				return a.loc.x < b.loc.x + b.size.x &&
+				 a.loc.x + a.size.x > b.loc.x &&
+				 a.loc.y + a.size.y < b.loc.y + 10 &&
+				 a.loc.y + a.size.y > b.loc.y;
+			}
+			
+			class Player
+			{
+				constructor(x, y, playerNum)
+				{
+					this.loc = new Vector(x, y);
+					this.move = new Vector(0, 0);
+					this.size = PLAYER_SIZE;
+					this.frame = 0;
+					this.isRunning = false;
+					this.runningLeft = true;
+					this.jumping = true;
+					this.running = [];
+					this.standingLeft = new Image();
+					this.standingRight = new Image();
+					this.jumpingLeft = new Image();
+					this.jumpingRight = new Image();
+					if (playerNum == 1)
+					{
+						this.standingLeft.src = "Sprites/Player/team1a_f1.png";
+						this.standingRight.src = "Sprites/Player/team1a_f1_right.png";
+						var runningFrames = [
+							"Sprites/Player/team1a_f2.png",
+							"Sprites/Player/team1a_f3.png",
+							"Sprites/Player/team1a_f2_right.png",
+							"Sprites/Player/team1a_f3_right.png"
+						];
+						for (var i = 0; i < runningFrames.length; i++)
+						{
+							this.running.push(new Image());
+							this.running[i].src = runningFrames[i];
+						}
+						this.jumpingLeft.src = "Sprites/Player/team1a_fall.png";
+						this.jumpingRight.src = "Sprites/Player/team1a_fall_right.png";
+					}
+					else if (playerNum == 2)
+					{
+						this.standingLeft.src = "Sprites/Player/team2a_f1.png";
+						this.standingRight.src = "Sprites/Player/team2a_f1_right.png";
+						var runningFrames = [
+							"Sprites/Player/team2a_f2.png",
+							"Sprites/Player/team2a_f3.png",
+							"Sprites/Player/team2a_f2_right.png",
+							"Sprites/Player/team2a_f3_right.png"
+						];
+						for (var i = 0; i < runningFrames.length; i++)
+						{
+							this.running.push(new Image());
+							this.running[i].src = runningFrames[i];
+						}
+						this.runningLeft = false;
+						this.jumpingLeft.src = "Sprites/Player/team2a_fall.png";
+						this.jumpingRight.src = "Sprites/Player/team2a_fall_right.png";
+					}
+				}
+				
+				draw()
+				{
+					if (this.loc.x <= -this.size.x)
+					{
+						this.loc.x = CANVAS_WIDTH;
+					}
+					else if (this.loc.x >= CANVAS_WIDTH)
+					{
+						this.loc.x = -this.size.x;
+					}
+					if (this.jumping)
+					{
+						if (this.runningLeft)
+						{
+							canvas.drawImage(
+								this.jumpingLeft,
+								this.loc.x, 
+								this.loc.y
+							);
+						}
+						else
+						{
+							canvas.drawImage(
+								this.jumpingRight,
+								this.loc.x, 
+								this.loc.y
+							);
+						}
+						if (this.move.y < 0)
+						{
+							this.move.y++;
+						}
+					}
+					else if (this.isRunning && this.runningLeft)
+					{
+						canvas.drawImage(
+							this.running[this.frame % 2],
+							this.loc.x, 
+							this.loc.y
+						);
+						if (frame % 6 == 0)
+						{
+							this.frame++;
+						}
+					}
+					else if (this.isRunning && !this.runningLeft)
+					{
+						canvas.drawImage(
+							this.running[this.frame % 2 + 2],
+							this.loc.x, 
+							this.loc.y
+						);
+						if (frame % 6 == 0)
+						{
+							this.frame++;
+						}
+					}
+					else if (this.runningLeft && !this.isRunning && !this.jumping)
+					{
+						canvas.drawImage(
+							this.standingLeft,
+							this.loc.x, 
+							this.loc.y
+						);
+					}
+					else if (!this.runningLeft && !this.isRunning && !this.jumping)
+					{
+						canvas.drawImage(
+							this.standingRight,
+							this.loc.x, 
+							this.loc.y
+						);
+					}
+					this.loc.add(this.move);
+					if (this.jumping)
+					{
+						this.loc.add(gravity);
+					}
+				}
+			}
+			
+			var tileSprites = createTileSprites();
+			
+			function createTileSprites()
+			{
+				var tileNames = 
+				[
+					"brickB_blue.png",
+					"brickB_orange.png",
+					"brickD_gen.png",
+					"brickE_gen.png",
+					"brickG_blue.png",
+					"brickG_orange.png",
+					"brickH_blue.png",
+					"brickH_orange.png",
+					"brickK_blue.png",
+					"brickK_orange.png"
+				];
+				var sprites = [];
+				for (var i = 0; i < tileNames.length; i++)
+				{
+					sprites.push(new Image());
+					sprites[i].src = "Sprites/Level/" + tileNames[i];
+				}
+				return sprites;
+			}
+			
+			class Tile
+			{
+				constructor(x, y, tileNum)
+				{
+					this.loc = new Vector(x, y);
+					this.sprite = tileNum;
+					this.size = tileSizeVector;
+				}
+				
+				draw()
+				{
+					canvas.drawImage(
+						tileSprites[this.sprite],
+						this.loc.x, 
+						this.loc.y
+					);
+				}
+			}
+			
+			var player1 = new Player(CANVAS_WIDTH - PLAYER_SIZE.x, 0, 1);
+			var player2 = new Player(0, 0, 2);
+			var tiles = [];
+			var tileSize = 32;
+			var tileSizeVector = new Vector(tileSize, tileSize);
+			
+			document.body.addEventListener("keydown", keyPressed);
+			document.body.addEventListener("keyup", function(event){
+				var charCode = event.key;
+				switch (charCode)
+				{
+					case 'W':
+					{
+					}
+					case 'w':
+					{
+						if (player1.jumping)
+						{
+							player1.move.y = 0;
+						}
+						break;
+					}
+					case 'A':
+					{
+					}
+					case 'a':
+					{
+					}
+					case 'D':
+					{
+					}
+					case 'd':
+					{
+						player1.isRunning = false;
+						player1.move.x = 0;
+						break;
+					}
+				}
+				if (charCode == "ArrowLeft" || charCode == "ArrowRight")
+				{
+					player2.isRunning = false;
+					player2.move.x = 0;
+				}
+				if (charCode == "ArrowUp")
+				{
+					if (player2.jumping)
+					{
+						player2.move.y = 0;
+					}
+				}
+			});
+			
+			function keyPressed(event){
+				//console.log(event.which);
+				var charCode = event.key;
+				switch (charCode)
+				{
+					case 'f':
+					{
+						var dir = "";
+						var x = 0;
+						if (player1.runningLeft)
+						{
+							dir = "left";
+							x = player1.loc.x - FIREBALL_SIZE.x;
+						}
+						else 
+						{
+							dir = "right";
+							x = player1.loc.x + player1.size.x;
+						}
+						var y = player1.loc.y;
+						fireballs.push(new Fireball(x, y, dir));
+						break;
+					}
+					case 'W':
+					{
+					}
+					case 'w':
+					{
+						if (!player1.jumping)
+						{
+							player1.jumping = true;
+							player1.move.y = -25;
+						}
+						break;
+					}
+					case 'A':
+					{
+					}
+					case 'a':
+					{
+						player1.isRunning = true;
+						player1.runningLeft = true;
+						player1.move.x = -5;
+						break;
+					}
+					case 'D':
+					{
+					}
+					case 'd':
+					{
+						player1.isRunning = true;
+						player1.runningLeft = false;
+						player1.move.x = 5;
+						break;
+					}
+				}
+				if (charCode == "ArrowLeft")
+				{
+					player2.isRunning = true;
+					player2.runningLeft = true;
+					player2.move.x = -5;
+				}
+				else if (charCode == "ArrowRight")
+				{
+					player2.isRunning = true;
+					player2.runningLeft = false;
+					player2.move.x = 5;
+				}
+				if (charCode == "ArrowUp")
+				{
+					if (!player2.jumping)
+					{
+						player2.jumping = true;
+						player2.move.y = -25;
+					}
+				}
+				if (charCode == "k")
+				{
+					var dir = "";
+					var x = 0;
+					if (player2.runningLeft)
+					{
+						dir = "left";
+						x = player2.loc.x - FIREBALL_SIZE.x;
+					}
+					else 
+					{
+						dir = "right";
+						x = player2.loc.x + player2.size.x;
+					}
+					var y = player2.loc.y;
+					fireballs.push(new Fireball(x, y, dir));
+				}
+			}
+			
+			function drawStage()
+			{
+				var y = CANVAS_HEIGHT - tileSize;
+				for (var i = 0; i < CANVAS_WIDTH; i += tileSize)
+				{
+					tiles.push(new Tile(i, y, 0));
+				}
+				
+				y = tileSize * 13;
+				
+				for (var i = 4; i < 10; i++)
+				{
+					tiles.push(new Tile(i * tileSize, y, 0));
+				}
+				
+				for (var i = 15; i < 21; i++)
+				{
+					tiles.push(new Tile(i * tileSize, y, 0));
+				}
+				
+				y = tileSize * 9;
+				
+				for (var i = 9; i < 16; i++)
+				{
+					tiles.push(new Tile(i * tileSize, y, 0));
+				}
+				
+				y = tileSize * 5;
+				
+				for (var i = 4; i < 10; i++)
+				{
+					tiles.push(new Tile(i * tileSize, y, 0));
+				}
+				
+				for (var i = 15; i < 21; i++)
+				{
+					tiles.push(new Tile(i * tileSize, y, 0));
+				}
+			}
+			
+			drawStage();
+			
+			var p1StandingOn = -1;
+			var p2StandingOn = -1;
+			
+			function draw()
+			{
+				canvas.fillStyle = "black";
+				canvas.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+				player1.draw();
+				player2.draw();
+				if (fireballs.length > 0)
+				{
+					fireballs = fireballs.filter(function(fireball) {
+						return fireball.active;
+					});
+					fireballs.forEach(
+						function(fireball)
+						{
+							fireball.draw();
+							if (collides(player1, fireball))
+							{
+								reset(1);
+								fireball.active = false;
+								p2Score++;
+								document.getElementById("p2").innerHTML = p2Score;
+							}
+							if (collides(player2, fireball))
+							{
+								reset(2);
+								fireball.active = false;
+								p1Score++;
+								document.getElementById("p1").innerHTML = p1Score;
+							}
+						}
+					);
+				}
+				tiles.forEach(
+					function(tile)
+					{
+						tile.draw();
+						if (collidesUp(player1, tile))
+						{
+							player1.jumping = false;
+							player1.move.y = 0;
+							player1.loc.y = tile.loc.y - 48;
+							p1StandingOn = tiles.indexOf(tile);
+						}
+						if (collidesUp(player2, tile))
+						{
+							player2.jumping = false;
+							player2.move.y = 0;
+							player2.loc.y = tile.loc.y - 48;
+							p2StandingOn = tiles.indexOf(tile);
+						}
+					}
+				);
+				if (!collidesUp(player1, tiles[p1StandingOn]))
+				{
+					player1.jumping = true;
+				}
+				if (!collidesUp(player2, tiles[p2StandingOn]))
+				{
+					player2.jumping = true;
+				}
+				frame++;
+			}
+			
+			function reset(pNum)
+			{
+				if (pNum == 1)
+				{
+					player1.loc.x = CANVAS_WIDTH - PLAYER_SIZE.x;
+					player1.loc.y = 0;
+				}
+				else if (pNum == 2)
+				{
+					player2.loc.x = 0;
+					player2.loc.y = 0;
+				}
+			}
+		</script>
+		<p id="score">
+			<b>Player 1: </b><i id="p1">0</i><br>
+			<b>Player 2: </b><i id="p2">0</i><br>
+		</p>
+	</body>
+</html>
