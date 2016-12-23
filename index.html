@@ -190,6 +190,14 @@
 				 a.loc.y + a.size.y > b.loc.y;
 			}
 			
+			function ballCollides(a, b)
+			{
+				return a.loc.x <= b.loc.x + b.size.x &&
+				 a.loc.x + a.size.x >= b.loc.x &&
+				 a.loc.y + a.size.y <= b.loc.y + b.size.y &&
+				 a.loc.y + a.size.y >= b.loc.y;
+			}
+			
 			function collidesUp(a, b)
 			{
 				return a.loc.x < b.loc.x + b.size.x &&
@@ -589,6 +597,18 @@
 						function(fireball)
 						{
 							fireball.draw();
+							fireballs.forEach(
+								function(f){
+									if (fireball != f)
+									{
+										if (ballCollides(fireball, f))
+										{
+											fireball.active = false;
+											f.active = false;
+										}
+									}
+								}
+							);
 							if (collides(player1, fireball))
 							{
 								if (fireball.owner != 1)
