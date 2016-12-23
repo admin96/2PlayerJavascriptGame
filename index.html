@@ -599,7 +599,7 @@
 							fireball.draw();
 							fireballs.forEach(
 								function(f){
-									if (fireball != f)
+									if (fireball.owner != f.owner)
 									{
 										if (ballCollides(fireball, f))
 										{
